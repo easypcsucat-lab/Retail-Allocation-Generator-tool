@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Retail Auto Allocation Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --navy:#e8edf3;
+    --navy-2:#c7d3e0;
+    --blue:#4fb3e0;
+    --blue-light:#12212c;
+    --ink:#eef1f4;
+    --paper:#000000;
+    --panel:#0c0c0c;
+    --line:#2a2a2a;
+    --good:#3fbf72;
+    --warn:#e08a3c;
+    --white:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Segoe UI',Arial,Helvetica,sans-serif;
+    background-color:#000000;
+    background-image:
+      linear-gradient(rgba(120,255,160,.45) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(120,255,160,.45) 1px, transparent 1px),
+      linear-gradient(to bottom, #000000 0%, #04240f 30%, #0d7a34 65%, #22c55e 100%);
+    background-size:34px 34px, 34px 34px, 100% 100%;
+    background-repeat:repeat, repeat, no-repeat;
+    background-attachment:scroll, scroll, fixed;
+    color:var(--ink);
+    padding:32px 20px 60px;
+    min-height:100vh;
+  }
+  .wrap{max-width:960px;margin:0 auto;}
+  .header-row{display:flex;align-items:center;gap:22px;margin-bottom:22px;flex-wrap:wrap;}
+  .logo{height:120px;width:auto;display:block;flex-shrink:0;}
+  .header-text{display:flex;flex-direction:column;justify-content:center;}
+  h1{
+    font-size:26px;
+    letter-spacing:.3px;
+    color:var(--navy);
+    margin:0 0 4px;
+  }
+  .sub{color:#c7d0d8;font-size:14px;margin:0;}
+
+  .flow{display:flex;flex-direction:column;align-items:center;gap:0;}
+
+  .gen-box{
+    width:100%;
+    max-width:520px;
+    border:2px solid var(--navy);
+    background:var(--panel);
+    border-radius:6px;
+    padding:22px 24px;
+    text-align:center;
+    cursor:pointer;
+    transition:box-shadow .15s ease, transform .1s ease;
+    box-shadow:0 1px 2px rgba(0,0,0,.5);
+  }
+  .gen-box:hover{box-shadow:0 4px 18px rgba(79,179,224,.25);}
+  .gen-box:active{transform:translateY(1px);}
+  .gen-box .label{
+    font-size:11px;
+    letter-spacing:1.5px;
+    color:var(--blue);
+    font-weight:600;
+    margin-bottom:6px;
+  }
+  .gen-box .title{
+    font-size:17px;
+    font-weight:700;
+    color:var(--navy);
+    letter-spacing:.3px;
+  }
+  .gen-box .hint{
+    margin-top:8px;
+    font-size:12.5px;
+    color:#8a9199;
+  }
+  #fileInput{display:none;}
+
+  .status-bar{
+    max-width:520px;
+    margin:14px auto 0;
+    font-size:13px;
+    text-align:center;
+    color:var(--good);
+    min-height:18px;
+  }
+  .status-bar.error{color:var(--warn);}
+
+  .controls{
+    max-width:700px;
+    margin:26px auto 18px;
+    display:none;
+  }
+  .controls.show{display:block;}
+
+  .control-row{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    justify-content:center;
+    flex-wrap:wrap;
+    margin-bottom:18px;
+  }
+  .control-row label{
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:.5px;
+    color:var(--navy-2);
+    text-transform:uppercase;
+  }
+  select{
+    font-family:inherit;
+    font-size:14px;
+    padding:8px 12px;
+    border:1px solid var(--line);
+    border-radius:5px;
+    background:var(--panel);
+    color:var(--ink);
+    min-width:230px;
+  }
+
+  .summary{
+    display:flex;
+    gap:14px;
+    justify-content:center;
+    flex-wrap:wrap;
+    margin-bottom:22px;
+  }
+  .pill{
+    background:var(--blue-light);
+    border:1px solid #234559;
+    border-radius:6px;
+    padding:10px 16px;
+    font-size:13px;
+    color:var(--navy-2);
+    text-align:center;
+    min-width:150px;
+  }
+  .pill b{display:block;font-size:19px;color:var(--navy);margin-top:2px;}
+
+  .export-row{
+    display:flex;
+    gap:24px;
+    justify-content:center;
+    flex-wrap:wrap;
+    max-width:700px;
+    margin:0 auto;
+  }
+  .export-box{
+    flex:1 1 260px;
+    max-width:320px;
+    border:2px solid #ffffff;
+    background:var(--panel);
+    border-radius:6px;
+    padding:20px;
+    text-align:center;
+    cursor:pointer;
+    transition:box-shadow .15s ease, transform .1s ease;
+  }
+  .export-box:hover{box-shadow:0 4px 18px rgba(255,255,255,.15);}
+  .export-box:active{transform:translateY(1px);}
+  .export-box .company{
+    font-weight:700;
+    font-size:14.5px;
+    color:var(--ink);
+    letter-spacing:.2px;
+  }
+  .export-box .desc{
+    font-size:12px;
+    color:#8a9199;
+    margin-top:6px;
+  }
+  .export-box .count{
+    margin-top:10px;
+    font-size:12.5px;
+    color:var(--blue);
+    font-weight:600;
+  }
+
+  .reset-link{
+    display:block;
+    text-align:center;
+    margin-top:26px;
+    font-size:12.5px;
+    color:#8a9199;
+    cursor:pointer;
+  }
+  .reset-link:hover{color:var(--blue);text-decoration:underline;}
+
+  .footnote{
+    max-width:700px;
+    margin:34px auto 0;
+    font-size:11.5px;
+    color:#e6f4ea;
+    line-height:1.6;
+    border-top:1px solid rgba(255,255,255,.25);
+    padding-top:14px;
+    text-align:center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header-row">
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAOEAAADhCAYAAAA+s9J6AAAZIUlEQVR4nO3dbXRU5YEH8P9z78xkJq9ABKTAgi0SkAANxUAV5EWUVmoq3Yrr226tPa2lH/asrK4923bPnj39sOshds+e0m3PKh66VYlbAQE1gLwGhYhEIBGoCKEkCIQECUlmMjP3Pvvh3jvvSWaSSR6o/985cyYvM3funbn/e5/XO0JKCSJSR1O9AkRfdAwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYgwhkWIMIZFiDCGRYq5sL/BXW38q/cFL8Awfge7g59lefK9Ep4nyW76Fu7+6XKTz+IPN1bLh3Hu4EujCKG8xJo8vw62jSzDCNTGt5/elLdwom6404fSFs7jWeQ7t3VeTHhOQ4Wy8VEpe4cLdpQ9iSvGsfm1PW7hRrqv+LYy8MLwieVdx1l3vdOG+0kcxeUKpWLt2rVy3bh08Hs/AVj5GcXExZs+ejUWLFqGsrCyjbWlpaZHvv/8+ampqcOTIEQSDwayt1+XLl7Fz506MHDlyQPtL1kN4pvsIruZchH7Nne1FR0ghk/4WCgWRd60YT5ZO7/P5jV0N8n92VqKp/QgMnwEAMILAu6c3YJxvGn6wdJWcmDttQG/shmO/kwc+qcbFQBMAIKgHkedL3jHNAcY9GI7fqTwu6zWkkAh0htDedgk/Xf5iv5a99dBr+OjqThj2juvVPej0B+HL9SAYDkL3aNBNN4Zdm4jJE0oFAFy5cgW7d+8ewBal9uqrrwIAysvL5erVqzFv3rw+37nKykq5atWqrK9LrGyEOuvFURn2ZnuRSYQUcTcA0P0efKPsCYxyTer1w/nMPC0rt/wcZ0OHoRVq0D0a3G4PvHkeaIUSF/UG/NfGf8Ol8KnkpKfhROth+bMN35evf/wbXMxpBIrCQFEY3jw3TGGFztAkDE3CFIAmB3bz6h54XDmRe+fvgIA3z42T/nrsOvVmxtvSFm6U757egKAetN8ja/19uVbIvboHmnTBuCaxYsET/Xmr+qW2thbz589HZWVlj9vU0tIiFy1aNOgBzJZBqRNqUu/lf8nvXaq/9cU6G0pIYUI3gULXWDww/dE+j447aqtwxX0GHlcOhNTgNlzQTSvYuilgCqAVZ/B/e1/NeJ1qm/fKX219Fhf1Bnjz3PaynRKBgBSAjFlDKQBTiAHfAETuHdY2aXDnAxsOv4y2cGNGb/Kr+38Lwxe0Dk7SZa+/hBTSDrn1GpNvmoE5Y5dmpfieiVWrVvUYxMWLFw/K2XiwDFLDjADQ22cuIx+o8zhNyqSb9b/kmxQSpgjD0MIwhYFQh4FH7/xRn2vV2NUgD53fC90T3ezYHdlaDwBFYXx0bitOtB5Oe8c90rpdrtnzDDoLWmEKKwDOcnXTnXDmdm4p3hm7qJ2qyN3T36QwIzfTDrZhJ8UUApflGew5vi3dTcHRlhr5QfN2+0DlrLdTArG2K6SHEeowsOxrK9JebratWrUKdXV1cW/Ks88+K+vr64dsHbJR9x3y1tFUdSCriJZ864mQgNuwqrNuw4US38y0jsZ/rH0ZbeKzXtZNRNbPX9iNrcfSOxu2hRvlr7f8HCgKw+PKQU8Bi65/fFE68X+x96n+l3pZWtz/hYy+gb7cHFTXVaGxq6HPg0oAl+TWmrVw5/dcmpFCwm24cPvYezCz+J4hPwvGeu655yI/Nzc3y+eff17h2vSPgi4K6yyQeFZIrOcJKXqtCxmatSOIKwLL5vVdJznaUiOP2WdBJ8A9rZ8mdcAXwrHze3GwubrPHXfP8W3o8HYDSH22cv4ee+bPLhFzn5wJQwuhs6AVbx14o88lHWmuw0n/kV4bjISE9b7f/lj/VjeLtm3bhpMnT0oAWL9+verV6ZchD2Fs0UkKE4YWgqGFIjtp7C3V2dHQ4s+mMycuwoyRvbeUBXBJVtW8BHd+7/VVJ0C6KaAbOXDnA5tre/9gPzNPy+q6KgzLGW4dFFJmzCo+O0VoILnonenNkVx8j39dh9vtxtGmPTjaUtPjUaAt3Cir9vR+FgQA4xowv+QBDLQFOVvee+89AMDmzZuH/LWz0Tqa9S6KvuimQKc/1YpnvjGF3cV48L4n+3zc+6cOoMl/1GoNNQUMDSnDEluccxsuGJpEU8dR7Dr1plw0qSLlDvfnzz5Be04rfHoOAKuxJWUQr7pQ5C0GAHjhS2PrMhOAHyEtgJDWGakPAta6OI1DWqGJrTVrMWP5vJTLOHB8G1pxBrrouU6vSYk811gsm/03Wd+G/jp37hwA3FCNMbGGPIShDgOP3fEjFLtvgc+TB3+wEyKDnVLCH/m5yDsyrS6JDYdfhlao2yFLPlto0qoPRoqLMfUyrVDDhsMvY9rE22Sq1/rTuTrk+TwwYTfqyOiZWgoJ3QR8gbFYufRn/e4070sAl+TZjk/wwhv/AnO4tY2xdUJHSOvEp58fxMHmaplYh27sapBv1lVBHw67xdlajvO+OO9dqMPAI+XfG9CAhpUrV+Lhhx/u9TFtbW345S9/idra2j6X19HRkdHrP/PMM6ioqMjoOT0ZO3bsgD/TIQ6hBKBjXF5pn0XIbDnQsAPt4WZokIitL0lhAhDQTed3q8ioSRdMIewiHmAI4LI8g/3Hd2L59ElJyz/ecjby+NhlOyEIdRj4x4pVKMkfnAACgBejREn+KNw5eYl8++z6SF9eIlMA2rA8bK5dj1vvL5GxQdp9cAsCrmuAFk4osse0SLebGO2dgK9Pmjug9R09enRane0VFRWYPn16Vls7V69ejaeffvq6KEY7FDTMGEP2So1dDbK6rgru/MT/SJjCgCnCCHUAt3hnwGyHXaeLBsrpYvDmubHp2Is42bE/dY1PyEhXh6HJuGWM9k5ASf6dQ/KhL539XRR2F/f4fymAkB5Gk/9oXJdFw9U9subTtyPvkykMu/4d7RMEAG94GB5Z8BS8GDVkO/HTTz+d1eU99NBDWV1eNigIYe+V/mzaebQKAdfnAKwdK24tTDc0qaPEV4qnFv8znln2H8gNF0OTMtLXFld0LQpjx4db0nhVEdlxhQSuXGvOuKO8v0a5JomlZSvg7woiVZ3OOjjo0Ap17Dr+TmRU0Dt1WxDO7YjUJa3O+Xhmu4npE25HSfHMwd2IQZbNMa3ZMsQhtA6gUvP38biBO9pSI9/70x+hF+h2cVG3i6BW45AmJcx2q3tjhGuimFa0QCwv/zt0+oMpOsyt9f6geWdS62JxQX5C/1xs57+AHC6x8dDawd3YGAum3osv582yf0se6OD0J7aH/4wth36PI63b5bHze6EVWgdH3XTbRXSr+G5oErop4A0Pw/zblg3pWfCLYsgbZgxfEFUfvIS3/K9JAOiEBNz25xqy92+3sH52C+Tao1u6gibyQsCYYZPxvUX/1OeOsL1hE8SwPMgeOs5DHQZuH3tPXN10zLBxSY8TUkTCqBUCVTUvxbUujh8xDh9e7IYvN8c+iwpr5Ip9fDM0iUMX9uHihiflV74yA27R/5bRYb6bUVw0AuOGj+uxYWSEa6K4v2yF/M+aw/DmuVN28FvbouHQhX04cv4DuPMBww6dU4x2+nANLYyA38Q3Jy8Zsnr8F82Qh9DjysGF0GnAFTuOMiZ8zu9uYTWUBPVIEFztGpbf9ZM+X+Ngc7V9dAd00+pv1O0mS+fI7gm5kjqbu/0SHiM6C0GPNnNChytSn4ptXSyftARv1b9i1Qsh7EYZpyhrjWTp1jtxCg34+NPDA3jnLLpfR6HrrzBr5Bx53/y/Ttk6PHNsGaZ7ZuG0WR85Kzsttc4mOevVrXfCGSwBxPfBalLCAJAfyLmuuiT+0iia1Js4SkaLFJNih2Bp0hVpZdRNgZkTF6XVzL+5dr3dyCDjxoVadT0Dnf4g5pYsTeps/vTCxwCMpCFl0TGgLugFOqr2RIuXE3OniRJfKQKdQRhaKGEb43/2uHIGdHO73dAKdXT6zmP3Z2/gZ394DBuO/U4GcCmuiOzFKFGx+G+RGy6OdLukHkTQ8xhW5/0KdphYUvZw1uZYUrLremZ9XF0rzWFSu069KU8H6yKtlLHDyKwZAC6MdI/Bt2Y/Hve8AC7JD88ejBst4owltVo/Aad41opT2HjsD5EFL7/rJ8gP5MDQu+0GoMHZX3XT6lLRpIReIGCMADYd+x1+vft5JAZxWtECUTLs6wh0BmOGzGVGk8BN4hYsue3bWdsGSnZdh9BhXDPwzVnf73OYVFu4UW44/DI8+VpSa6jDbDew8NYHkopxJ1uPoKn9SNKUICC2XmiF2J2vY+fxP0ZaPacUzxLzSx6AcdUN3Uws4Q/OeNHIMLUiiQ8v7sCLe15ICuJ9c7+Dwu7ilB336Qh1AI/e+SOlZ8HKykpVLz1khrxOmBmrnyrP9VdYMPXePh+94+NNuCzPwGd67FEw1jKcM5OQAkXeUbhz6uK457WFG+XWD6uAIgkDIbgNV2SkiNNSaNhnQt209vMr7jPYeug1PD7XGsX/+NznRGvrVfnR1e3QC+Lf1uiIk4GQCOnhuMHnUljdCd48if0X3sHIozdjxYy/j/x/Yu40sbRshXzj1G/gdntSHmB6e71xvmmDMlfw4sWLqKnpeQwrYI2YeeGFFzCU05JUURRCp3gUrXulmthraBKhayYeveuhPo/GbeFG+Vb9K/AWeqCZzl9FpDHC0KwRHwunJ58F39y3Hn+6XAcUWb9Hh7DBbtRBZBiX28xDSOuE7tHw7ukNmD/j/silMJ5a9g94/UAR9p3cCDncCg2AmIm96Yl9L5zZ9wAg7ZEszjpYywZMocGTr+Gt+ldQPmlJ3KU5Fky9F7uOvwO/3gzTLpZGz4zRIXtAdKK0bgqEOgysuOf7Ga13utasWYM1a9ZkbXn5+UmjMW4oCmZROJNyDcRO6E2cLe60aI4rnIm54xb1udzX9v4ehi9o99Mlv6YpDIz2Tkg6ozZ2Ncj3/rwBWqFmFTUNl1XnMhG5xV6Owtn5NemCXiCwcdf/RpblxSjx+NznxJNL/hWjjWnAVQEjaCZNvHVmj6S6t36OTjZ2Zt9bfzOsybT2OiSeXQ1fELsPxg8oGOGaKL4x9RsIdRhJ/Z/OSB+naGu9d1YxPrH75no2fvx41aswIErOhGa7NW4zoId6fVx+IAcr7nuizw7iE62H5UfntsIzIidmyFn8GcUImvhm+YqkM+q+o5sRdIcR7Ox7OJ0v12OPKrG6TyCAjy/vShoQPWfsUjFn+VIcbK6Wh07txnl/I5rbTicszQUz5b1DJv1s+EzoHi1ykHG2LzIFy6PhcMtBfC/hleZOvRd7PqnGRdFotzgnTxyOa8D6vBPLlqifK5iuO+64Q/UqDMiQD+A22w2suOMHmDB8KgDACPY+jC2do/G79a9DDo/W/ZwOc6cjUjcFRsovpzyj3n7rvZg8vgxer1UoCATMpMcAwPm2s6iuq4Ix7Jo9ptKFkKsT/kITm2vXY87ypUnPmTN2qZgz1vp7JkPXwki+DGJXsBs7j1bhwMlquIpy7f4954wZgiZ1mMJAe7gZJ1oPy9iunBGuieKRBU/Jf9/xLHy5iV0n0TmUIT0MI2ji7smPXTdzBfuycOFClJSU3BDr2hMlZ8LbRs3P2od8pHW7/KB5uz1VKfY/zmBqDXob8J0lP0x5Rk17etFYYPjwIvny3uehF+gArIm/8ABNVxuwu2m9XDjuoR6XNeAWRhfwyNyfyECXC/Xtu6xJz8K69osmdavOqrlgwsAF/yeYgllxT59ZfI/42ugl8kT73sjfUjXUjJBjbqiO+b+E1tMhHzvqCgcQ8HdnZWlt4Ub5yp7/tvv2rHqNUwx16jfBcDdKJszPSiufNaxNt/sbpV1/1KEXAG/XVg36QG0vRom7yxejq6sdgFOcjL6kN5wHALjUdiHl82eNm580oVo6jVZCwG24MLl45g3TMb969eqMLwZ8PRriEEqEXV4Eza6sLO3A8W24GGiK1NOkiF5/BrBaJX3tObhnWnY6mz+/2oGgbu3ETmONNVM/jIuBsxld0ay/At1dCOrWgIDEFmarwUaHR9yU1rKcg1XsmNEbRX/nBZ48eXIwVmdAFMyi0Ac8i6It3ChPduyX7x7bGTdXMDr+0YAUJvxd3WldgyZdh07tRp7PEzfUDrCKg+58HdV1Vf2+aHA62sKN8vW9r8KbZ41vTRxa5xQvx4xIL4Q3ovLycuzbt6/fE3N//OMfRy4Mdb0Y8jqhVijx0p4XUOB5LfpGhDJ7T0LyqnVNldxA/LKl0+VhNfaMdI/J2hXBrGtx7oReEP/Zm3a9zBQCgYJWvL7/RcwrXSyBnht5+qPL3413j21Ek78B8Nj9j9K+dowEAGugerCrA6OHJ88GuZ6UlpbippvSP1CMGTMGs2fPRnl5eVoz8ntTX1+PKVOmoLS0dMBBrK+vx6VLl66/76JIR4e7FR2yzb5YrQHNraccUdLTeEenJa+3K6cFOkNYNOGurDQAOVdr0wqd689EW2KjsyasLoL9F97BB807MRhXEMjNLYReYC1Zk7o1y0FDXG/G+BFTrvuWzQcffBC/+MUvlK7j9TQSR8nV1izWDi0i3/aTasxm9Gdn6Jd1KUQZCaDzN1OEIYQ7MnG3sLsYS2d/NyvrfKBpF5r8DdBdWmTmfaQOJZ2rXUvopgvePHvb4kr6Mduc9HPiffK22y+DAGIGCsScZJ1B5oHOEObeltxV8kWxcuXKrI7EGSqDWCdMfaCLjv6ImX2e4pqj1g0x398gIvfO90ZYgXaGvemRkTGhUAiLv3p/n1diS0cAl+TbtfHXqdESAhIdeodIOHqbohX/c+J94qXyo9O+ossVca8tBRBydaGwuzitMbapr4J+XZ8807J06Y15ABqUEDpN56mCFf1/9INP3AH7ujlnQ0OTkTNf7EyBL8kvZ236zc5jG3EuZI12SWxBjDaGRL+jwbp8v/PlL7FX3U6cTSF7uE/NOdtHXzvaCiykgN7mxRN3P5NW94L1HR4i5vmIvI83soqKClFaWqp6NTKW9RD6XNGiVaoAZYNzFoy9AYApwnC1dqccntYfbeFG+WZdFXy5OSmuAp568am3OfYWeWQP91GxdWLr7O8MBJeR4jkgYVwL49vTf5h2X6hzIado627q77m4Ea1bt071KmQs6yEMwG9f6j31Ny05g4X7d+l3mXQ2cjhH8psLytMa8J2O1/b+Hu05rfay489oUpgZbVeqiy71fIv24SVf+j5aotCkdUn6+0ofx/LpP8wgRfFjTmMHit/oysrKxKZNm1SvRkYGrWHGuthRz0d3o5+fd0/PM4UBXBW4f8FDWbki2NGWGll7YQt8BR7IHoqKRmLl0F6/VGcV58CUDk3q9nbKhO2NGefZYeBLhTNx/4IVGY0G0j1W/VE3rMv2QyAy7tQImYP69d1DpaKiQuzbt0/Onz9f9aqkJesh7GzrAnIFTAx1HUNgnC97X1i5ccd6eEICwWsSyMK2BPVMlmHCY+j286yuDut3Hd5wAaZPuB2zv7awX9tqtAaBAg/0mHSbdlFZh44g2jJdZJxML0k/WObNmyeklFi7dq2srKy8rrokEgmZ5eFKJ5pqZTAnCI+Wm9XlpmNU0YisjXs80VQr4cveMSobQ/UK84bj5tyRAzrTp/pWpsTPaiDfmdHc3Cz7CmJ+fn5WvsMhEy0tLbKtbWAHmFSyMYMj6yEkoszcEBd6IvpLxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIpxhASKcYQEinGEBIp9v+9RsT9VkeZfgAAAABJRU5ErkJggg==" alt="EasyPC logo" class="logo">
+  </div>
+    <div class="header-text">
+      <h1>Retail Auto Allocation Generator</h1>
+      <div class="sub">Import the raw allocation workbook, filter by store, and export purchase-order files per vendor.</div>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="gen-box" id="genBox">
+      <div class="label">GENERATE</div>
+      <div class="title">RETAIL AUTO ALLOCATION</div>
+      <div class="hint" id="genHint">Click to import the raw allocation Excel file (.xlsx / .xlsm)</div>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx,.xlsm,.xls">
+
+    <div class="status-bar" id="statusBar"></div>
+
+    <div class="controls" id="controls">
+      <div class="control-row">
+        <label for="storeSelect">Store</label>
+        <select id="storeSelect"></select>
+      </div>
+
+      <div class="summary" id="summary"></div>
+
+      <div class="export-row">
+        <div class="export-box" id="exportTechItEasy">
+          <div class="company">TECH IT EASY VENTURES INC.</div>
+          <div class="desc">All items excluding HOUSEBRAND lines</div>
+          <div class="count" id="countTechItEasy">—</div>
+        </div>
+        <div class="export-box" id="exportTechnexus">
+          <div class="company">TECHNEXUS COMPUTING SOLUTIONS INC.</div>
+          <div class="desc">HOUSEBRAND lines only</div>
+          <div class="count" id="countTechnexus">—</div>
+        </div>
+      </div>
+
+      <div class="reset-link" id="resetLink">Import a different file</div>
+    </div>
+  </div>
+
+  <div class="footnote">
+    Build by Mark M.
+  </div>
+</div>
+
+<script>
+const STORE_NAMES = {
+  ALA: "Alabang Store",
+  ALS: "Angeles Store",
+  BAC: "Bacoor Store",
+  BWG: "Baliwag Store",
+  FVW: "Fairview Store",
+  MKZ: "Makati Store",
+  MLS: "Malolos Store",
+  MND: "Mandaluyong Store",
+  MNL: "Manila Store",
+  MKN: "Marikina Store",
+  MON: "Monumento Store",
+  OAS: "Oasis Store",
+  SFN: "San Fernando Store",
+  SUC: "Sucat Store",
+  TPT: "Touchpoint Store",
+  ECOM: "Ecom / Online"
+};
+
+let parsedRows = [];      // [{sku, desc, lob, qtyByStore: {code: number}}]
+let storeCols = [];        // [{code,label}] in file order
+let currentFileName = "";
+
+const genBox = document.getElementById('genBox');
+const genHint = document.getElementById('genHint');
+const fileInput = document.getElementById('fileInput');
+const statusBar = document.getElementById('statusBar');
+const controls = document.getElementById('controls');
+const storeSelect = document.getElementById('storeSelect');
+const summaryEl = document.getElementById('summary');
+const resetLink = document.getElementById('resetLink');
+
+genBox.addEventListener('click', () => fileInput.click());
+resetLink.addEventListener('click', () => {
+  parsedRows = [];
+  storeCols = [];
+  currentFileName = "";
+  fileInput.value = "";
+  controls.classList.remove('show');
+  statusBar.textContent = "";
+  statusBar.classList.remove('error');
+  genHint.textContent = "Click to import the raw allocation Excel file (.xlsx / .xlsm)";
+});
+
+fileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  currentFileName = file.name.replace(/\.[^.]+$/, "");
+  statusBar.classList.remove('error');
+  statusBar.textContent = "Reading " + file.name + " …";
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    try {
+      const data = new Uint8Array(evt.target.result);
+      const wb = XLSX.read(data, {type:'array', cellDates:false});
+      loadWorkbook(wb);
+    } catch (err) {
+      console.error(err);
+      showError("Could not read that file. Make sure it's a valid .xlsx/.xlsm export.");
+    }
+  };
+  reader.onerror = () => showError("Failed to read the file from disk.");
+  reader.readAsArrayBuffer(file);
+});
+
+function showError(msg){
+  statusBar.classList.add('error');
+  statusBar.textContent = msg;
+  controls.classList.remove('show');
+}
+
+function loadWorkbook(wb){
+  // Find a sheet whose header row contains SKU + at least one *_ALLOC column
+  let best = null;
+  for (const sheetName of wb.SheetNames){
+    const ws = wb.Sheets[sheetName];
+    const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true, blankrows:false});
+    for (let r = 0; r < Math.min(aoa.length, 5); r++){
+      const row = aoa[r] || [];
+      const upper = row.map(c => (c===null||c===undefined) ? "" : String(c).trim().toUpperCase());
+      const hasSku = upper.includes("SKU");
+      const hasAlloc = upper.some(h => h.endsWith("_ALLOC"));
+      if (hasSku && hasAlloc){
+        best = {sheetName, headerRowIdx:r, aoa, headers: upper, rawHeaders: row};
+        break;
+      }
+    }
+    if (best) break;
+  }
+
+  if (!best){
+    showError("Couldn't find a sheet with SKU + store allocation columns (e.g. ALA_ALLOC). Check the file and try again.");
+    return;
+  }
+
+  const {aoa, headerRowIdx, headers} = best;
+  const skuIdx = headers.indexOf("SKU");
+  const descIdx = headers.indexOf("ITEM DESCRIPTION");
+  const lobIdx = headers.indexOf("LOB");
+
+  if (skuIdx === -1 || descIdx === -1){
+    showError("Sheet '" + best.sheetName + "' is missing an SKU or ITEM DESCRIPTION column.");
+    return;
+  }
+  if (lobIdx === -1){
+    showError("Sheet '" + best.sheetName + "' is missing the LOB column needed to split HOUSEBRAND rows.");
+    return;
+  }
+
+  storeCols = [];
+  headers.forEach((h, i) => {
+    if (h.endsWith("_ALLOC")){
+      const code = h.replace(/_ALLOC$/, "");
+      storeCols.push({code, idx:i, label: STORE_NAMES[code] || code});
+    }
+  });
+
+  parsedRows = [];
+  for (let r = headerRowIdx + 1; r < aoa.length; r++){
+    const row = aoa[r];
+    if (!row) continue;
+    const sku = row[skuIdx];
+    if (sku === null || sku === undefined || sku === "") continue;
+    const desc = row[descIdx];
+    const lob = (row[lobIdx] === null || row[lobIdx] === undefined) ? "" : String(row[lobIdx]).trim().toUpperCase();
+    const qtyByStore = {};
+    storeCols.forEach(sc => {
+      const v = row[sc.idx];
+      const n = Number(v);
+      qtyByStore[sc.code] = isFinite(n) ? n : 0;
+    });
+    parsedRows.push({sku, desc, lob, qtyByStore});
+  }
+
+  if (parsedRows.length === 0){
+    showError("No data rows found under the header on '" + best.sheetName + "'.");
+    return;
+  }
+
+  // Populate store dropdown
+  storeSelect.innerHTML = "";
+  const optAll = document.createElement('option');
+  optAll.value = "ALL";
+  optAll.textContent = "All Stores (Total)";
+  storeSelect.appendChild(optAll);
+  storeCols
+    .slice()
+    .sort((a,b) => a.label.localeCompare(b.label))
+    .forEach(sc => {
+      const opt = document.createElement('option');
+      opt.value = sc.code;
+      opt.textContent = sc.label;
+      storeSelect.appendChild(opt);
+    });
+
+  statusBar.classList.remove('error');
+  statusBar.textContent = "Loaded " + parsedRows.length.toLocaleString() + " SKU rows from '" + best.sheetName + "'.";
+  genHint.textContent = "Loaded: " + currentFileName + " — click to re-import";
+  controls.classList.add('show');
+  updateSummary();
+}
+
+function qtyForRow(row, storeCode){
+  if (storeCode === "ALL"){
+    let sum = 0;
+    storeCols.forEach(sc => sum += (row.qtyByStore[sc.code] || 0));
+    return sum;
+  }
+  return row.qtyByStore[storeCode] || 0;
+}
+
+function splitRows(storeCode){
+  const techItEasy = [];
+  const technexus = [];
+  parsedRows.forEach(row => {
+    const qty = qtyForRow(row, storeCode);
+    if (!qty || qty <= 0) return;
+    const line = {sku: row.sku, desc: row.desc, qty};
+    if (row.lob === "HOUSEBRAND"){
+      technexus.push(line);
+    } else {
+      techItEasy.push(line);
+    }
+  });
+  return {techItEasy, technexus};
+}
+
+function updateSummary(){
+  const storeCode = storeSelect.value || "ALL";
+  const {techItEasy, technexus} = splitRows(storeCode);
+
+  const storeLabel = storeCode === "ALL" ? "All Stores (Total)" : (STORE_NAMES[storeCode] || storeCode);
+  summaryEl.innerHTML = "";
+  const pillStore = document.createElement('div');
+  pillStore.className = 'pill';
+  pillStore.innerHTML = "Selected Store<b>" + storeLabel + "</b>";
+  const pillA = document.createElement('div');
+  pillA.className = 'pill';
+  pillA.innerHTML = "TECH IT EASY lines<b>" + techItEasy.length.toLocaleString() + "</b>";
+  const pillB = document.createElement('div');
+  pillB.className = 'pill';
+  pillB.innerHTML = "TECHNEXUS lines<b>" + technexus.length.toLocaleString() + "</b>";
+  summaryEl.appendChild(pillStore);
+  summaryEl.appendChild(pillA);
+  summaryEl.appendChild(pillB);
+
+  document.getElementById('countTechItEasy').textContent = techItEasy.length.toLocaleString() + " line item(s) ready";
+  document.getElementById('countTechnexus').textContent = technexus.length.toLocaleString() + " line item(s) ready";
+}
+
+storeSelect.addEventListener('change', updateSummary);
+
+function buildExportSheet(vendorName, rows, exportedAt){
+  const header = ['Vendor','Order Deadline','Expected Arrival','Currency','Product/Internal Reference','Order Lines/Product/Name','Order Lines/Quantity'];
+  const aoa = [header];
+  rows.forEach((r, i) => {
+    if (i === 0){
+      aoa.push([vendorName, null, null, 'PHP', r.sku, r.desc, r.qty]);
+    } else {
+      aoa.push([null, null, null, null, r.sku, r.desc, r.qty]);
+    }
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  if (rows.length > 0){
+    // Column B/C: the actual date and time this file was exported (not a live formula).
+    ws['B2'] = {t:'n', v: dateToSerial(exportedAt), z:'m/d/yyyy h:mm:ss'};
+    ws['C2'] = {t:'n', v: dateToSerial(exportedAt), z:'m/d/yyyy h:mm:ss'};
+  }
+  ws['!cols'] = [{wch:32},{wch:18},{wch:18},{wch:10},{wch:16},{wch:58},{wch:12}];
+  return ws;
+}
+
+// Convert a JS Date to an Excel serial date number (days since 1899-12-30), local time.
+function dateToSerial(date){
+  const epoch = new Date(Date.UTC(1899, 11, 30));
+  const asUTC = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(), date.getMinutes(), date.getSeconds());
+  return (asUTC - epoch.getTime()) / 86400000;
+}
+
+function exportCompany(vendorName, rows, fileLabel){
+  const storeCode = storeSelect.value || "ALL";
+  const storeLabel = storeCode === "ALL" ? "AllStores" : storeCode;
+  if (rows.length === 0){
+    alert("No line items to export for " + vendorName + " under the current store filter.");
+    return;
+  }
+  const exportedAt = new Date();
+  const ws = buildExportSheet(vendorName, rows, exportedAt);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+  const stamp = exportedAt.toISOString().slice(0,10);
+  const filename = fileLabel + "_" + storeLabel + "_" + stamp + ".xlsx";
+  XLSX.writeFile(wb, filename);
+}
+
+document.getElementById('exportTechItEasy').addEventListener('click', () => {
+  const storeCode = storeSelect.value || "ALL";
+  const {techItEasy} = splitRows(storeCode);
+  exportCompany("TECH IT EASY VENTURES INC.", techItEasy, "TECH_IT_EASY_VENTURES_INC");
+});
+
+document.getElementById('exportTechnexus').addEventListener('click', () => {
+  const storeCode = storeSelect.value || "ALL";
+  const {technexus} = splitRows(storeCode);
+  exportCompany("TECHNEXUS COMPUTING SOLUTIONS INC.", technexus, "TECHNEXUS_COMPUTING_SOLUTIONS_INC");
+});
+</script>
+</body>
+</html>
