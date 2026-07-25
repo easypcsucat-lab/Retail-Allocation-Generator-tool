@@ -325,6 +325,45 @@ function showError(msg){
   controls.classList.remove('show');
 }
 
+// Explicit export ordering: CLASS A items first, then B, then C, then S.
+// Anything outside this set sorts after, alphabetically; blank/unknown class sorts last.
+const CLASS_ORDER = ['A', 'B', 'C', 'S'];
+function classRank(cls){
+  if (!cls) return 9999;
+  const idx = CLASS_ORDER.indexOf(cls);
+  if (idx !== -1) return idx;
+  return 100 + cls.charCodeAt(0);
+}
+
+// Scans every sheet in the workbook for a SEGMENT/CATEGORY -> CLASS lookup table
+// (e.g. a tab literally named "SEGMENT") and returns a Map of upper-cased
+// category name -> class letter. Returns null if no such sheet is found.
+function buildSegmentClassMap(wb){
+  for (const sheetName of wb.SheetNames){
+    const ws = wb.Sheets[sheetName];
+    const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true, blankrows:false});
+    for (let r = 0; r < Math.min(aoa.length, 5); r++){
+      const row = aoa[r] || [];
+      const upper = row.map(c => (c===null||c===undefined) ? "" : String(c).trim().toUpperCase());
+      const catCol = upper.indexOf("SEGMENT") !== -1 ? upper.indexOf("SEGMENT") : upper.indexOf("CATEGORY");
+      const clsCol = upper.indexOf("CLASS");
+      if (catCol !== -1 && clsCol !== -1){
+        const map = new Map();
+        for (let rr = r + 1; rr < aoa.length; rr++){
+          const dataRow = aoa[rr];
+          if (!dataRow) continue;
+          const cat = dataRow[catCol];
+          const cls = dataRow[clsCol];
+          if (cat === null || cat === undefined || cat === "") continue;
+          map.set(String(cat).trim().toUpperCase(), cls === null || cls === undefined ? "" : String(cls).trim().toUpperCase());
+        }
+        return map;
+      }
+    }
+  }
+  return null;
+}
+
 function loadWorkbook(wb){
   // Find a sheet whose header row contains SKU + at least one *_ALLOC column
   let best = null;
@@ -353,6 +392,8 @@ function loadWorkbook(wb){
   const skuIdx = headers.indexOf("SKU");
   const descIdx = headers.indexOf("ITEM DESCRIPTION");
   const lobIdx = headers.indexOf("LOB");
+  const categoryIdx = headers.indexOf("CATEGORY");
+  const classIdx = headers.indexOf("CLASS");
 
   if (skuIdx === -1 || descIdx === -1){
     showError("Sheet '" + best.sheetName + "' is missing an SKU or ITEM DESCRIPTION column.");
@@ -361,6 +402,14 @@ function loadWorkbook(wb){
   if (lobIdx === -1){
     showError("Sheet '" + best.sheetName + "' is missing the LOB column needed to split HOUSEBRAND rows.");
     return;
+  }
+
+  // If the sheet itself has no CLASS column, look for a SEGMENT/CATEGORY -> CLASS
+  // lookup sheet elsewhere in the workbook (e.g. a tab named "SEGMENT") so export
+  // rows can still be ordered by class.
+  let segmentClassMap = null;
+  if (classIdx === -1){
+    segmentClassMap = buildSegmentClassMap(wb);
   }
 
   storeCols = [];
@@ -379,13 +428,20 @@ function loadWorkbook(wb){
     if (sku === null || sku === undefined || sku === "") continue;
     const desc = row[descIdx];
     const lob = (row[lobIdx] === null || row[lobIdx] === undefined) ? "" : String(row[lobIdx]).trim().toUpperCase();
+    let cls = "";
+    if (classIdx !== -1){
+      cls = (row[classIdx] === null || row[classIdx] === undefined) ? "" : String(row[classIdx]).trim().toUpperCase();
+    } else if (segmentClassMap && categoryIdx !== -1){
+      const cat = (row[categoryIdx] === null || row[categoryIdx] === undefined) ? "" : String(row[categoryIdx]).trim().toUpperCase();
+      cls = segmentClassMap.get(cat) || "";
+    }
     const qtyByStore = {};
     storeCols.forEach(sc => {
       const v = row[sc.idx];
       const n = Number(v);
       qtyByStore[sc.code] = isFinite(n) ? n : 0;
     });
-    parsedRows.push({sku, desc, lob, qtyByStore});
+    parsedRows.push({sku, desc, lob, cls, qtyByStore});
   }
 
   if (parsedRows.length === 0){
@@ -431,13 +487,17 @@ function splitRows(storeCode){
   parsedRows.forEach(row => {
     const qty = qtyForRow(row, storeCode);
     if (!qty || qty <= 0) return;
-    const line = {sku: row.sku, desc: row.desc, qty};
+    const line = {sku: row.sku, desc: row.desc, qty, cls: row.cls};
     if (row.lob === "HOUSEBRAND"){
       technexus.push(line);
     } else {
       techItEasy.push(line);
     }
   });
+  // Export order: CLASS A, then B, then C, then S (not SKU low-to-high).
+  // Array.sort is stable, so rows within the same class keep their original order.
+  techItEasy.sort((a, b) => classRank(a.cls) - classRank(b.cls));
+  technexus.sort((a, b) => classRank(a.cls) - classRank(b.cls));
   return {techItEasy, technexus};
 }
 
