@@ -428,12 +428,12 @@ function loadWorkbook(wb){
     if (sku === null || sku === undefined || sku === "") continue;
     const desc = row[descIdx];
     const lob = (row[lobIdx] === null || row[lobIdx] === undefined) ? "" : String(row[lobIdx]).trim().toUpperCase();
+    const category = (categoryIdx !== -1 && row[categoryIdx] !== null && row[categoryIdx] !== undefined) ? String(row[categoryIdx]).trim().toUpperCase() : "";
     let cls = "";
     if (classIdx !== -1){
       cls = (row[classIdx] === null || row[classIdx] === undefined) ? "" : String(row[classIdx]).trim().toUpperCase();
     } else if (segmentClassMap && categoryIdx !== -1){
-      const cat = (row[categoryIdx] === null || row[categoryIdx] === undefined) ? "" : String(row[categoryIdx]).trim().toUpperCase();
-      cls = segmentClassMap.get(cat) || "";
+      cls = segmentClassMap.get(category) || "";
     }
     const qtyByStore = {};
     storeCols.forEach(sc => {
@@ -441,7 +441,7 @@ function loadWorkbook(wb){
       const n = Number(v);
       qtyByStore[sc.code] = isFinite(n) ? n : 0;
     });
-    parsedRows.push({sku, desc, lob, cls, qtyByStore});
+    parsedRows.push({sku, desc, lob, cls, category, qtyByStore});
   }
 
   if (parsedRows.length === 0){
@@ -487,17 +487,23 @@ function splitRows(storeCode){
   parsedRows.forEach(row => {
     const qty = qtyForRow(row, storeCode);
     if (!qty || qty <= 0) return;
-    const line = {sku: row.sku, desc: row.desc, qty, cls: row.cls};
+    const line = {sku: row.sku, desc: row.desc, qty, cls: row.cls, category: row.category};
     if (row.lob === "HOUSEBRAND"){
       technexus.push(line);
     } else {
       techItEasy.push(line);
     }
   });
-  // Export order: CLASS A, then B, then C, then S (not SKU low-to-high).
-  // Array.sort is stable, so rows within the same class keep their original order.
-  techItEasy.sort((a, b) => classRank(a.cls) - classRank(b.cls));
-  technexus.sort((a, b) => classRank(a.cls) - classRank(b.cls));
+  // Export order: CLASS A, then B, then C, then S (not SKU low-to-high);
+  // within the same class, CATEGORY is ordered A-Z. Array.sort is stable, so
+  // rows sharing both class and category keep their original relative order.
+  const byClassThenCategory = (a, b) => {
+    const classDiff = classRank(a.cls) - classRank(b.cls);
+    if (classDiff !== 0) return classDiff;
+    return (a.category || "").localeCompare(b.category || "");
+  };
+  techItEasy.sort(byClassThenCategory);
+  technexus.sort(byClassThenCategory);
   return {techItEasy, technexus};
 }
 
