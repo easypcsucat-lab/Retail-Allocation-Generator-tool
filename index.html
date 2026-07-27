@@ -365,8 +365,13 @@ function buildSegmentClassMap(wb){
 }
 
 function loadWorkbook(wb){
-  // Find a sheet whose header row contains SKU + at least one *_ALLOC column
-  let best = null;
+  // Find a sheet whose header row contains SKU + at least one *_ALLOC column.
+  // Some workbooks contain more than one such sheet (e.g. a full working
+  // "Allocation" tab plus a finalized/reconciled "Retail Allocation" tab).
+  // When that happens the finalized one is the source of truth, so prefer any
+  // sheet literally named "Retail Allocation" over all others; otherwise fall
+  // back to the first matching sheet in workbook order.
+  const candidates = [];
   for (const sheetName of wb.SheetNames){
     const ws = wb.Sheets[sheetName];
     const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true, blankrows:false});
@@ -376,11 +381,15 @@ function loadWorkbook(wb){
       const hasSku = upper.includes("SKU");
       const hasAlloc = upper.some(h => h.endsWith("_ALLOC"));
       if (hasSku && hasAlloc){
-        best = {sheetName, headerRowIdx:r, aoa, headers: upper, rawHeaders: row};
+        candidates.push({sheetName, headerRowIdx:r, aoa, headers: upper, rawHeaders: row});
         break;
       }
     }
-    if (best) break;
+  }
+
+  let best = null;
+  if (candidates.length > 0){
+    best = candidates.find(c => c.sheetName.trim().toUpperCase() === "RETAIL ALLOCATION") || candidates[0];
   }
 
   if (!best){
@@ -394,6 +403,7 @@ function loadWorkbook(wb){
   const lobIdx = headers.indexOf("LOB");
   const categoryIdx = headers.indexOf("CATEGORY");
   const classIdx = headers.indexOf("CLASS");
+
 
   if (skuIdx === -1 || descIdx === -1){
     showError("Sheet '" + best.sheetName + "' is missing an SKU or ITEM DESCRIPTION column.");
